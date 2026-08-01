@@ -9,7 +9,35 @@
 
 #if (CSP_POSIX || __DOXYGEN__)
     #include <semaphore.h>
-    typedef sem_t csp_bin_sem_t;
+    #ifdef __APPLE__
+        /* macOS lacks unnamed POSIX semaphores (sem_init() -> ENOSYS),
+         * sem_timedwait() (not implemented at all), and deprecates
+         * sem_getvalue(). Use Grand Central Dispatch instead -- see
+         * arch/posix/csp_semaphore.c. The atomic mirrors the semaphore's
+         * logical value (0 or 1) so post() can replicate the original
+         * binary-cap behaviour (skip posting if already signaled). */
+        #include <dispatch/dispatch.h>
+        #ifdef __cplusplus
+        /* Raw C11 <stdatomic.h> conflicts with libc++'s atomic_flag when
+         * pulled into a C++ translation unit under Apple Clang. Use
+         * std::atomic<int> directly rather than a `using std::atomic_int;`
+         * alias -- some existing flight code already typedefs its own
+         * (non-atomic) atomic_int, which a `using` here would collide with. */
+        #include <atomic>
+        #else
+        #include <stdatomic.h>
+        #endif
+        typedef struct {
+            dispatch_semaphore_t sem;
+        #ifdef __cplusplus
+            std::atomic<int> available;
+        #else
+            atomic_int available;
+        #endif
+        } csp_bin_sem_t;
+    #else
+        typedef sem_t csp_bin_sem_t;
+    #endif
 #elif (CSP_FREERTOS)
     #include <FreeRTOS.h>
     #include <task.h>

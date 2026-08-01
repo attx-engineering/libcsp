@@ -61,8 +61,19 @@
 
 #include <csp/csp_interface.h>
 #include <stdint.h>
-#include <stdatomic.h>
 #include "csp/csp_types.h"
+
+#ifdef __cplusplus
+/* Pulling C11's raw <stdatomic.h> into a C++ translation unit conflicts with
+ * libc++'s atomic_flag on Apple Clang. Use <atomic> instead when compiled as
+ * C++ -- and use std::atomic<int> directly below rather than a
+ * `using std::atomic_int;` alias, since some existing flight code (see
+ * LibCspBackendCan.cpp) already `typedef`s its own atomic_int as a
+ * non-atomic compatibility shim; a `using` here would collide with that. */
+#include <atomic>
+#else
+#include <stdatomic.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -194,7 +205,11 @@ typedef int (*csp_can_driver_tx_t)(void * driver_data, uint32_t id, const uint8_
  * Interface data (state information).
  */
 typedef struct {
+#ifdef __cplusplus
+	std::atomic<int> cfp_packet_counter; /**< CFP Identification number - same number on all fragments from same CSP packet. */
+#else
 	atomic_int cfp_packet_counter; /**< CFP Identification number - same number on all fragments from same CSP packet. */
+#endif
 	csp_can_driver_tx_t tx_func; /**< Tx function */
 	csp_packet_t * pbufs; /**< PBUF queue */
 } csp_can_interface_data_t;

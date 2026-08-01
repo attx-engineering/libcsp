@@ -1,6 +1,16 @@
 #pragma once
 
+#ifdef __cplusplus
+/* Raw C11 <stdatomic.h> conflicts with libc++'s atomic_flag when pulled into
+ * a C++ translation unit under Apple Clang. Use <atomic> instead when
+ * compiled as C++ -- and use std::atomic<int> directly below rather than a
+ * `using std::atomic_int;` alias, since some existing flight code (see
+ * LibCspBackendCan.cpp) already `typedef`s its own atomic_int as a
+ * non-atomic compatibility shim; a `using` here would collide with that. */
+#include <atomic>
+#else
 #include <stdatomic.h>
+#endif
 
 #include <csp/csp.h>
 #include <csp/arch/csp_queue.h>
@@ -57,8 +67,13 @@ typedef struct {
 
 /** @brief Connection struct */
 struct csp_conn_s {
+#ifdef __cplusplus
+	std::atomic<int> type;   /* Connection type (CONN_CLIENT or CONN_SERVER) */
+	std::atomic<int> state; /* Connection state (CONN_OPEN or CONN_CLOSED) */
+#else
 	atomic_int type;   /* Connection type (CONN_CLIENT or CONN_SERVER) */
 	atomic_int state; /* Connection state (CONN_OPEN or CONN_CLOSED) */
+#endif
 	csp_id_t idin;          /* Identifier received */
 	csp_id_t idout;         /* Identifier transmitted */
 	uint8_t sport_outgoing; /* When used for outgoing, use this sport */

@@ -46,6 +46,8 @@ option(CSP_ENABLE_KISS_CRC "Enables the extra CRC in the KISS interface (legacy)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(CSP_POSIX 1)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(CSP_POSIX 1)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
   set(CSP_POSIX 1)
   message(WARNING "CYGWIN detected: experimental port and ethernet not implemented")
@@ -61,6 +63,15 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Generic")
 endif()
 
 if(CSP_POSIX AND CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+  # Reverted from a broader `if(CSP_POSIX)` (2026-07-30): widening this to
+  # run on Darwin let pkg-config find a real Homebrew libyaml, which flips on
+  # optional YAML support in src/CMakeLists.txt -- but that code only wires
+  # in ${LIBYAML_LIBRARIES}, never ${LIBYAML_LIBRARY_DIRS}, so the linker
+  # can't find it (Homebrew installs to /opt/homebrew/lib, not a default
+  # search path): `ld: library 'yaml' not found`. Nothing in this block
+  # turned out to be needed on Darwin -- Threads::Threads is independently
+  # provided by arch/posix/CMakeLists.txt, and the rest is optional
+  # yaml/zmq/socketcan/check feature detection this project doesn't use.
 
   include(CheckIncludeFiles)
   check_include_files(sys/socket.h HAVE_SYS_SOCKET_H)
@@ -113,6 +124,12 @@ target_include_directories(csp
   PUBLIC ${csp_inc}
   PRIVATE ${csp_inc_src}
 )
+if(APPLE)
+  # macOS has no <endian.h>; mac_compat/endian.h shims the handful of
+  # byte-swap macros libcsp's sources expect from it. Appended (not
+  # prepended) so a real <endian.h>, if one ever exists, would win.
+  target_include_directories(csp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/mac_compat)
+endif()
 
 add_library(csp_common INTERFACE)
 if(CSP_POSIX)
@@ -126,7 +143,7 @@ if(CSP_POSIX)
     -Wpointer-arith
     -Wshadow
     -Wwrite-strings
-    $<$<C_COMPILER_ID:Clang>:-Wno-gnu-zero-variadic-macro-arguments>)
+    $<$<OR:$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:AppleClang>>:-Wno-gnu-zero-variadic-macro-arguments>)
 endif()
 target_link_libraries(csp PRIVATE csp_common)
 

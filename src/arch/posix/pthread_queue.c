@@ -14,7 +14,15 @@ http://code.google.com/p/c-pthread-queue/
 #include <csp/csp.h>
 
 static inline int get_deadline(struct timespec * ts, uint32_t timeout_ms) {
+#ifdef __APPLE__
+	/* macOS's pthread_cond_timedwait() has no monotonic-clock option (see
+	 * init_cond_clock_monotonic() below), so the deadline must be computed
+	 * against the realtime clock to match what it actually compares
+	 * against -- otherwise every timed wait times out immediately. */
+	int ret = clock_gettime(CLOCK_REALTIME, ts);
+#else
 	int ret = clock_gettime(CLOCK_MONOTONIC, ts);
+#endif
 
 	if (ret < 0) {
 		return ret;
@@ -37,6 +45,12 @@ static inline int get_deadline(struct timespec * ts, uint32_t timeout_ms) {
 static inline int init_cond_clock_monotonic(pthread_cond_t * cond) {
 
 	int ret;
+#ifdef __APPLE__
+	/* pthread_condattr_setclock() / CLOCK_MONOTONIC condvars don't exist
+	 * on macOS; fall back to the default (realtime) clock -- get_deadline()
+	 * above computes deadlines against CLOCK_REALTIME on Apple to match. */
+	ret = pthread_cond_init(cond, NULL);
+#else
 	pthread_condattr_t attr;
 
 	pthread_condattr_init(&attr);
@@ -47,6 +61,7 @@ static inline int init_cond_clock_monotonic(pthread_cond_t * cond) {
 	}
 
 	pthread_condattr_destroy(&attr);
+#endif
 	return ret;
 }
 
