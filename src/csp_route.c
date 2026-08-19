@@ -109,7 +109,7 @@ __weak void csp_input_hook(csp_iface_t * iface, csp_packet_t * packet) {
 				   packet->id.sport, packet->id.pri, packet->id.flags, packet->length, iface->name, csp_get_ms());
 }
 
-int csp_route_work(void) {
+static int csp_route_work_impl(bool block) {
 
 	csp_qfifo_t input;
 	csp_packet_t * packet;
@@ -122,7 +122,7 @@ int csp_route_work(void) {
 #endif
 
 	/* Get next packet to route */
-	if (csp_qfifo_read(&input) != CSP_ERR_NONE) {
+	if ((block ? csp_qfifo_read(&input) : csp_qfifo_read_noblock(&input)) != CSP_ERR_NONE) {
 		return CSP_ERR_TIMEDOUT;
 	}
 
@@ -295,4 +295,12 @@ int csp_route_work(void) {
 	}
 
 	return CSP_ERR_NONE;
+}
+
+int csp_route_work(void) {
+	return csp_route_work_impl(true);
+}
+
+int csp_route_work_noblock(void) {
+	return csp_route_work_impl(false);
 }

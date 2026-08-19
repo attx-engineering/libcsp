@@ -22,6 +22,14 @@ int csp_qfifo_read(csp_qfifo_t * input) {
 	return CSP_ERR_NONE;
 }
 
+int csp_qfifo_read_noblock(csp_qfifo_t * input) {
+
+	if (csp_queue_dequeue(qfifo_queue_handle, input, 0) != CSP_QUEUE_OK)
+		return CSP_ERR_TIMEDOUT;
+
+	return CSP_ERR_NONE;
+}
+
 void csp_qfifo_write(csp_packet_t * packet, csp_iface_t * iface, void * pxTaskWoken) {
 
 	int result;

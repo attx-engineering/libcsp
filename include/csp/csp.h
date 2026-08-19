@@ -316,6 +316,17 @@ int csp_bind_callback(csp_callback_t callback, uint8_t port);
 int csp_route_work(void);
 
 /**
+ * Route packet from the incoming router queue and check RDP timeouts, without blocking.
+ * Identical to csp_route_work(), except that an empty router queue returns
+ * #CSP_ERR_TIMEDOUT immediately instead of waiting for a packet to arrive.
+ * Intended for callers that poll the router from an existing task rather than
+ * running it as a dedicated router task; such a caller must call this regularly
+ * for incoming packets to be routed and RDP timeouts to be checked.
+ * @return #CSP_ERR_NONE on success, otherwise an error code.
+ */
+int csp_route_work_noblock(void);
+
+/**
  * Set the bridge interfaces.
  *
  * @param[in] if_a CSP Interface `A`
